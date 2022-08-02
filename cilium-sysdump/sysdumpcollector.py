@@ -57,58 +57,58 @@ class SysdumpCollector(object):
     def collect_nodes_overview(self):
         log.info("collecting nodes overview ...")
 
-        nodes_overview_file_name = "nodes-{}.json".format(
-            utils.get_current_time())
-        cmd = "kubectl get nodes -o json > {}/{}".format(
-              self.sysdump_dir_name, nodes_overview_file_name)
+        nodes_overview_file_name = f"nodes-{utils.get_current_time()}.json"
+        cmd = f"kubectl get nodes -o json > {self.sysdump_dir_name}/{nodes_overview_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect nodes overview: {}".
-                          format(exc, nodes_overview_file_name))
+                log.error(
+                    f"Error: {exc}. Could not collect nodes overview: {nodes_overview_file_name}"
+                )
+
         else:
-            log.info("collected nodes overview: {}"
-                     .format(nodes_overview_file_name))
+            log.info(f"collected nodes overview: {nodes_overview_file_name}")
 
     def collect_pods_overview(self):
         log.info("collecting pods overview ...")
 
-        pods_overview_file_name = "pods-{}.json".format(
-            utils.get_current_time())
-        cmd = "kubectl get pods -o json --all-namespaces > {}/{}".format(
-              self.sysdump_dir_name, pods_overview_file_name)
+        pods_overview_file_name = f"pods-{utils.get_current_time()}.json"
+        cmd = f"kubectl get pods -o json --all-namespaces > {self.sysdump_dir_name}/{pods_overview_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect pods overview: {}".
-                          format(exc, pods_overview_file_name))
+                log.error(
+                    f"Error: {exc}. Could not collect pods overview: {pods_overview_file_name}"
+                )
+
         else:
-            log.info("collected pods overview: {}"
-                     .format(pods_overview_file_name))
+            log.info(f"collected pods overview: {pods_overview_file_name}")
 
     def collect_pods_summary(self):
         log.info("collecting pods summary ...")
 
-        pods_summary_file_name = "pods-{}.txt".format(
-            utils.get_current_time())
-        cmd = "kubectl get pods --all-namespaces -o wide > {}/{}".format(
-              self.sysdump_dir_name, pods_summary_file_name)
+        pods_summary_file_name = f"pods-{utils.get_current_time()}.txt"
+        cmd = f"kubectl get pods --all-namespaces -o wide > {self.sysdump_dir_name}/{pods_summary_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect pods summary: {}".
-                          format(exc, pods_summary_file_name))
+                log.error(
+                    f"Error: {exc}. Could not collect pods summary: {pods_summary_file_name}"
+                )
+
         else:
-            log.info("collected pods summary: {}"
-                     .format(pods_summary_file_name))
+            log.info(f"collected pods summary: {pods_summary_file_name}")
 
     def collect_logs(self, pool, subject, label_selector, node_filter):
-        log.info("collecting {} logs ...".format(subject))
+        log.info(f"collecting {subject} logs ...")
 
-        must_exist = not("hubble" in label_selector)  # hubble is optional
+        must_exist = "hubble" not in label_selector
         pool.map_async(
             self.collect_logs_per_pod,
             utils.get_pods_status_iterator_by_labels(
@@ -120,11 +120,13 @@ class SysdumpCollector(object):
     def collect_logs_per_pod(self, podstatus):
         containers = utils.get_container_names_per_pod(podstatus.namespace,
                                                        podstatus.name)
+        # Only get logs from previous containers if pod has restarted.
+        # Need to get the pod to access its restartCount.
+        podCommandPreFormatted = "kubectl get pod {} -n {} -o json"
         for container in containers:
-            log_file_name = "{}-{}-{}".format(podstatus.name, container,
-                                              utils.get_current_time())
+            log_file_name = f"{podstatus.name}-{container}-{utils.get_current_time()}"
             command = "kubectl logs {} --container={} --timestamps=true " \
-                      "--since={} --limit-bytes={} -n {} > {}/{}.log"
+                          "--since={} --limit-bytes={} -n {} > {}/{}.log"
             cmd = command.format(
                 podstatus.name, container, self.since, self.size_limit,
                 podstatus.namespace, self.sysdump_dir_name, log_file_name)
@@ -134,14 +136,10 @@ class SysdumpCollector(object):
                 )
             except subprocess.CalledProcessError as exc:
                 if exc.returncode != 0:
-                    log.error("Error: {}. Could not collect log file: {}"
-                              .format(exc, log_file_name))
+                    log.error(f"Error: {exc}. Could not collect log file: {log_file_name}")
             else:
-                log.info("collected log file: {}".format(log_file_name))
+                log.info(f"collected log file: {log_file_name}")
 
-            # Only get logs from previous containers if pod has restarted.
-            # Need to get the pod to access its restartCount.
-            podCommandPreFormatted = "kubectl get pod {} -n {} -o json"
             podCmd = podCommandPreFormatted.format(
                 podstatus.name, podstatus.namespace,
             )
@@ -171,9 +169,9 @@ class SysdumpCollector(object):
                     log_file_name_previous = "{0}-previous".format(
                         log_file_name)
                     command = "kubectl logs --previous --timestamps=true " \
-                              "--container={} " \
-                              "--since={} " \
-                              "--limit-bytes={} -n {} {} > {}/{}.log"
+                                  "--container={} " \
+                                  "--since={} " \
+                                  "--limit-bytes={} -n {} {} > {}/{}.log"
                     cmd = command.format(container, self.since,
                                          self.size_limit,
                                          podstatus.namespace, podstatus.name,
@@ -186,27 +184,26 @@ class SysdumpCollector(object):
                     except subprocess.CalledProcessError as exc:
                         if exc.returncode != 0:
                             log.debug(
-                                "Debug: {}. Could not collect previous "
-                                "log for '{}': {}"
-                                .format(exc, podstatus.name, log_file_name))
+                                f"Debug: {exc}. Could not collect previous log for '{podstatus.name}': {log_file_name}"
+                            )
+
                     else:
-                        log.info("collected log file: {}".format(
-                            log_file_name_previous))
+                        log.info(f"collected log file: {log_file_name_previous}")
 
                 else:
-                    log.debug("no previous pod logs to gather for "
-                              "pod/container {}/{}".format(
-                                  podstatus.name, container))
+                    log.debug(
+                        f"no previous pod logs to gather for pod/container {podstatus.name}/{container}"
+                    )
 
     def collect_gops_stats(self, pool, subject, label_selector, node_filter):
-        log.info("collecting {} gops stats ...".format(subject))
+        log.info(f"collecting {subject} gops stats ...")
 
         self.collect_gops(pool, label_selector, node_filter, "stats")
         self.collect_gops(pool, label_selector, node_filter, "memstats")
         self.collect_gops(pool, label_selector, node_filter, "stack")
 
     def collect_gops(self, pool, label_selector, node_filter, type_of_stat):
-        must_exist = not("hubble" in label_selector)  # hubble is optional
+        must_exist = "hubble" not in label_selector
         pool.map_async(
             functools.partial(self.collect_gops_per_pod,
                               type_of_stat=type_of_stat),
@@ -223,14 +220,10 @@ class SysdumpCollector(object):
         for container in containers:
             if container == "hubble-ui":
                 continue  # gops does not run in hubble-ui container
-            file_name = "{}-{}-{}-{}.txt".format(
-                podstatus.name,
-                container,
-                utils.get_current_time(),
-                type_of_stat)
-            cmd = "kubectl exec -n {} {} -c {} -- /bin/gops {} 1 > {}/{}" \
-                  .format(podstatus.namespace, podstatus.name, container,
-                          type_of_stat, self.sysdump_dir_name, file_name)
+            file_name = f"{podstatus.name}-{container}-{utils.get_current_time()}-{type_of_stat}.txt"
+
+            cmd = f"kubectl exec -n {podstatus.namespace} {podstatus.name} -c {container} -- /bin/gops {type_of_stat} 1 > {self.sysdump_dir_name}/{file_name}"
+
             try:
                 subprocess.check_output(
                     cmd,
@@ -239,181 +232,170 @@ class SysdumpCollector(object):
                 )
             except subprocess.CalledProcessError as exc:
                 if exc.returncode != 0:
-                    log.warning("Warning: {}. Could not collect gops {}: {}"
-                                .format(exc, type_of_stat, file_name))
+                    log.warning(
+                        f"Warning: {exc}. Could not collect gops {type_of_stat}: {file_name}"
+                    )
+
             else:
-                log.info("collected gops {} file: {}".format(
-                    type_of_stat, file_name))
+                log.info(f"collected gops {type_of_stat} file: {file_name}")
 
     def collect_netpol(self):
         log.info("collecting kubernetes network policy ...")
 
-        netpol_file_name = "netpol-{}.yaml".format(utils.get_current_time())
-        cmd = "kubectl get netpol -o yaml --all-namespaces > {}/{}".format(
-              self.sysdump_dir_name, netpol_file_name)
+        netpol_file_name = f"netpol-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get netpol -o yaml --all-namespaces > {self.sysdump_dir_name}/{netpol_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.warning("Warning: {}. Could not collect kubernetes network"
-                            " policy: {}".format(exc, netpol_file_name))
+                log.warning(
+                    f"Warning: {exc}. Could not collect kubernetes network policy: {netpol_file_name}"
+                )
+
         else:
-            log.info("collected kubernetes network policy: {}"
-                     .format(netpol_file_name))
+            log.info(f"collected kubernetes network policy: {netpol_file_name}")
 
     def collect_cnp(self):
         log.info("collecting cilium network policy ...")
 
-        cnp_file_name = "cnp-{}.yaml".format(utils.get_current_time())
-        cmd = "kubectl get cnp -o yaml --all-namespaces > {}/{}".format(
-              self.sysdump_dir_name, cnp_file_name)
+        cnp_file_name = f"cnp-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get cnp -o yaml --all-namespaces > {self.sysdump_dir_name}/{cnp_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.warning("Warning: {}. Could not collect cilium network "
-                            "policy: {}".format(exc, cnp_file_name))
+                log.warning(
+                    f"Warning: {exc}. Could not collect cilium network policy: {cnp_file_name}"
+                )
+
         else:
-            log.info("collected cilium network policy: {}"
-                     .format(cnp_file_name))
+            log.info(f"collected cilium network policy: {cnp_file_name}")
 
     def collect_ccnp(self):
         log.info("collecting cilium clusterwide network policy ...")
 
-        ccnp_file_name = "ccnp-{}.yaml".format(utils.get_current_time())
-        cmd = "kubectl get ccnp -o yaml --all-namespaces > {}/{}".format(
-              self.sysdump_dir_name, ccnp_file_name)
+        ccnp_file_name = f"ccnp-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get ccnp -o yaml --all-namespaces > {self.sysdump_dir_name}/{ccnp_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.warning("Warning: {}. Could not collect cilium clusterwide"
-                            " network policy: {}".format(exc, ccnp_file_name))
+                log.warning(
+                    f"Warning: {exc}. Could not collect cilium clusterwide network policy: {ccnp_file_name}"
+                )
+
         else:
-            log.info("collected cilium clusterwide network policy: {}"
-                     .format(ccnp_file_name))
+            log.info(f"collected cilium clusterwide network policy: {ccnp_file_name}")
 
     def collect_cep(self):
         log.info("collecting cilium endpoints ...")
 
-        cep_file_name = "cep-{}.yaml".format(utils.get_current_time())
-        cmd = "kubectl get cep -o yaml --all-namespaces > {}/{}".format(
-            self.sysdump_dir_name, cep_file_name)
+        cep_file_name = f"cep-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get cep -o yaml --all-namespaces > {self.sysdump_dir_name}/{cep_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect cilium endpoints {}"
-                          .format(exc, cep_file_name))
+                log.error(f"Error: {exc}. Could not collect cilium endpoints {cep_file_name}")
         else:
-            log.info("collected cilium endpoints: {}".format(cep_file_name))
+            log.info(f"collected cilium endpoints: {cep_file_name}")
 
     def collect_ciliumids(self):
         log.info("collecting cilium identities ...")
 
-        ciliumids_file_name = "ciliumidentities-{}.yaml".format(
-            utils.get_current_time())
-        cmd = ("kubectl get ciliumidentities -o yaml --all-namespaces > {}/{}"
-               .format(self.sysdump_dir_name, ciliumids_file_name))
+        ciliumids_file_name = f"ciliumidentities-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get ciliumidentities -o yaml --all-namespaces > {self.sysdump_dir_name}/{ciliumids_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect cilium identities {}"
-                          .format(exc, ciliumids_file_name))
+                log.error(
+                    f"Error: {exc}. Could not collect cilium identities {ciliumids_file_name}"
+                )
+
         else:
-            log.info("collected cilium identities: {}".format(
-                ciliumids_file_name))
+            log.info(f"collected cilium identities: {ciliumids_file_name}")
 
     def collect_ciliumnodes(self):
         log.info("collecting cilium nodes ...")
 
-        ciliumnodes_file_name = "ciliumnodes-{}.yaml".format(
-            utils.get_current_time())
-        cmd = ("kubectl get ciliumnodes -o yaml --all-namespaces > {}/{}"
-               .format(self.sysdump_dir_name, ciliumnodes_file_name))
+        ciliumnodes_file_name = f"ciliumnodes-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get ciliumnodes -o yaml --all-namespaces > {self.sysdump_dir_name}/{ciliumnodes_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error("Error: {}. Could not collect cilium nodes {}"
-                          .format(exc, ciliumnodes_file_name))
+                log.error(
+                    f"Error: {exc}. Could not collect cilium nodes {ciliumnodes_file_name}"
+                )
+
         else:
-            log.info("collected cilium nodes: {}".format(
-                ciliumnodes_file_name))
+            log.info(f"collected cilium nodes: {ciliumnodes_file_name}")
 
     def collect_deployment_yaml(self, name):
-        log.info("collecting {} deployment yaml ...".format(name))
+        log.info(f"collecting {name} deployment yaml ...")
 
         ns = namespace.cilium_ns
-        fname = "{}-deployment-{}.yaml".format(name, utils.get_current_time())
-        cmd = "kubectl get deployment {} -n {} -oyaml > {}/{}".format(
-            name, ns, self.sysdump_dir_name, fname)
+        fname = f"{name}-deployment-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get deployment {name} -n {ns} -oyaml > {self.sysdump_dir_name}/{fname}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.warning("{}. Unable to get {} deployment yaml".format(
-                    exc, name,
-                ))
+                log.warning(f"{exc}. Unable to get {name} deployment yaml")
         else:
-            log.info("collected {} deployment yaml file: {}".format(
-                name, fname))
+            log.info(f"collected {name} deployment yaml file: {fname}")
 
     def collect_daemonset_yaml(self, name):
-        log.info("collecting {} daemonset yaml ...".format(name))
+        log.info(f"collecting {name} daemonset yaml ...")
 
         ns = namespace.cilium_ns
         if name == "hubble":
             ns = namespace.hubble_ns
-        file_name = "{}-ds-{}.yaml".format(name, utils.get_current_time())
-        cmd = "kubectl get ds {} -n {} -oyaml > {}/{}".format(
-            name, ns, self.sysdump_dir_name, file_name)
+        file_name = f"{name}-ds-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get ds {name} -n {ns} -oyaml > {self.sysdump_dir_name}/{file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
-            if exc.returncode != 0:
-                if name != "hubble":  # hubble is optional, do not warn
-                    log.warning("{}. Unable to get {} daemonset yaml".format(
-                        exc, name,
-                    ))
+            if exc.returncode != 0 and name != "hubble":
+                log.warning(f"{exc}. Unable to get {name} daemonset yaml")
         else:
-            log.info("collected {} daemonset yaml file: {}".format(
-                name, file_name))
+            log.info(f"collected {name} daemonset yaml file: {file_name}")
 
     def collect_cilium_configmap(self):
         log.info("collecting cilium configmap yaml ...")
 
-        configmap_file_name = "cilium-configmap-{}.yaml".format(
-            utils.get_current_time())
-        cmd = "kubectl get configmap cilium-config -n {} -oyaml " \
-              "> {}/{}".format(namespace.cilium_ns,
-                               self.sysdump_dir_name, configmap_file_name)
+        configmap_file_name = f"cilium-configmap-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get configmap cilium-config -n {namespace.cilium_ns} -oyaml > {self.sysdump_dir_name}/{configmap_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.warning("Warning: {}. Unable to get cilium configmap yaml"
-                            .format(exc))
+                log.warning(f"Warning: {exc}. Unable to get cilium configmap yaml")
         else:
-            log.info("collected cilium configmap yaml file: {}".format(
-                configmap_file_name))
+            log.info(f"collected cilium configmap yaml file: {configmap_file_name}")
 
     def collect_cilium_secret(self):
         log.info("collecting cilium etcd secret ...")
 
-        secret_file_name = "cilium-etcd-secrets-{}.json".format(
-            utils.get_current_time())
-        cmd = "kubectl get secret cilium-etcd-secrets -n {} -o json".format(
-            namespace.cilium_ns)
+        secret_file_name = f"cilium-etcd-secrets-{utils.get_current_time()}.json"
+        cmd = f"kubectl get secret cilium-etcd-secrets -n {namespace.cilium_ns} -o json"
+
         try:
             output = json.loads(
                 subprocess.check_output(
                     cmd, shell=True, stderr=subprocess.STDOUT,
                 ).decode("utf-8"))
-            data = {}
-            for key, value in output.get('data').items():
-                data[key] = "XXXXX"
+            data = {key: "XXXXX" for key, value in output.get('data').items()}
             output['data'] = data
             with open(
                 os.path.join(self.sysdump_dir_name,
@@ -421,16 +403,17 @@ class SysdumpCollector(object):
                 fp.write(json.dumps(output))
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.info("{}. Unable to get and redact cilium secret (this is "
-                         "expected in CRD mode).".format(exc))
+                log.info(
+                    f"{exc}. Unable to get and redact cilium secret (this is expected in CRD mode)."
+                )
+
         else:
-            log.info("collected and redacted cilium secret file: {}".format(
-                secret_file_name))
+            log.info(f"collected and redacted cilium secret file: {secret_file_name}")
 
     def collect_cilium_bugtool_output(self, pool, label_selector, node_filter):
         log.info("collecting cilium-bugtool output ...")
 
-        must_exist = not("hubble" in label_selector)  # hubble is optional
+        must_exist = "hubble" not in label_selector
         pool.map_async(
             self.collect_cilium_bugtool_output_per_pod,
             utils.get_pods_status_iterator_by_labels(
@@ -440,44 +423,36 @@ class SysdumpCollector(object):
             ))
 
     def collect_cilium_bugtool_output_per_pod(self, podstatus):
-        bugtool_output_dir = "bugtool-{}-{}".format(
-            podstatus.name, utils.get_current_time())
-        bugtool_output_file_name = "{}.tar".format(bugtool_output_dir)
-        cmd = "kubectl exec -n {} {} -c cilium-agent cilium-bugtool".format(
-            podstatus.namespace, podstatus.name)
+        bugtool_output_dir = f"bugtool-{podstatus.name}-{utils.get_current_time()}"
+        bugtool_output_file_name = f"{bugtool_output_dir}.tar"
+        cmd = f"kubectl exec -n {podstatus.namespace} {podstatus.name} -c cilium-agent cilium-bugtool"
+
         try:
             encoded_output = subprocess.check_output(
                 cmd.split(), shell=False, stderr=subprocess.STDOUT,
             )
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
-                log.error(
-                    "Error: {}. Could not run cilium-bugtool on {}"
-                    .format(exc, podstatus.name))
+                log.error(f"Error: {exc}. Could not run cilium-bugtool on {podstatus.name}")
         else:
             output = encoded_output.decode()
             p = re.compile(
                 "^ARCHIVE at (.*)$")
             output_file_name = ""
             for line in output.splitlines():
-                match = p.search(line)
-                if match:
-                    output_file_name = match.group(1)
+                if match := p.search(line):
+                    output_file_name = match[1]
             if output_file_name == "":
                 log.error(
                     "Error: could not find cilium-bugtool output file name",
                 )
 
-            copyCmd = "kubectl cp {}/{}:{} ./{}/{}".format(
-                podstatus.namespace, podstatus.name, output_file_name,
-                self.sysdump_dir_name, bugtool_output_file_name)
-            mkdirCmd = "mkdir -p ./{}/{}".format(
-                    self.sysdump_dir_name, bugtool_output_dir)
-            tarCmd = "tar -xf ./{}/{} -C ./{}/{} --strip-components=1".format(
-                self.sysdump_dir_name, bugtool_output_file_name,
-                self.sysdump_dir_name, bugtool_output_dir)
-            rmCmd = "rm ./{}/{}".format(
-                    self.sysdump_dir_name, bugtool_output_file_name)
+            copyCmd = f"kubectl cp {podstatus.namespace}/{podstatus.name}:{output_file_name} ./{self.sysdump_dir_name}/{bugtool_output_file_name}"
+
+            mkdirCmd = f"mkdir -p ./{self.sysdump_dir_name}/{bugtool_output_dir}"
+            tarCmd = f"tar -xf ./{self.sysdump_dir_name}/{bugtool_output_file_name} -C ./{self.sysdump_dir_name}/{bugtool_output_dir} --strip-components=1"
+
+            rmCmd = f"rm ./{self.sysdump_dir_name}/{bugtool_output_file_name}"
             try:
                 subprocess.check_output(
                     copyCmd.split(), shell=False, stderr=subprocess.STDOUT,
@@ -494,75 +469,66 @@ class SysdumpCollector(object):
             except subprocess.CalledProcessError as exc:
                 if exc.returncode != 0:
                     log.error(
-                        "Error: {} Could not collect cilium-bugtool"
-                        " output: {}".format(
-                            exc, bugtool_output_file_name))
+                        f"Error: {exc} Could not collect cilium-bugtool output: {bugtool_output_file_name}"
+                    )
+
             else:
-                log.info("collected cilium-bugtool output: {}".format(
-                    bugtool_output_file_name))
+                log.info(f"collected cilium-bugtool output: {bugtool_output_file_name}")
 
     def collect_services_overview(self):
         log.info("collecting services overview ...")
 
-        svc_file_name = "services-{}.yaml".format(
-            utils.get_current_time())
-        cmd = "kubectl get svc --all-namespaces -oyaml " \
-              "> {}/{}".format(self.sysdump_dir_name, svc_file_name)
+        svc_file_name = f"services-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get svc --all-namespaces -oyaml > {self.sysdump_dir_name}/{svc_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
                 log.error("Error: {}. Unable to get svc overview")
         else:
-            log.info("collected svc overview: {}".format(svc_file_name))
+            log.info(f"collected svc overview: {svc_file_name}")
 
     def collect_k8s_version_info(self):
         log.info("collecting kubernetes version info ...")
 
-        version_file_name = "k8s-version-info-{}.txt".format(
-            utils.get_current_time())
-        cmd = "kubectl version > {}/{}".format(self.sysdump_dir_name,
-                                               version_file_name)
+        version_file_name = f"k8s-version-info-{utils.get_current_time()}.txt"
+        cmd = f"kubectl version > {self.sysdump_dir_name}/{version_file_name}"
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
                 log.error("Error: {}. Unable to get kubernetes version info")
         else:
-            log.info("collected kubernetes version info: {}"
-                     .format(version_file_name))
+            log.info(f"collected kubernetes version info: {version_file_name}")
 
     def collect_k8s_events(self):
         log.info("collecting Kubernetes events JSON ...")
 
-        events_file_name = "k8s-events-{}.json".format(
-            utils.get_current_time())
-        cmd = "kubectl get events --all-namespaces -o json > {}/{}".format(
-                self.sysdump_dir_name, events_file_name)
+        events_file_name = f"k8s-events-{utils.get_current_time()}.json"
+        cmd = f"kubectl get events --all-namespaces -o json > {self.sysdump_dir_name}/{events_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
                 log.error("Error: {}. Unable to get kubernetes events.")
         else:
-            log.info("collected kubernetes events: {}"
-                     .format(events_file_name))
+            log.info(f"collected kubernetes events: {events_file_name}")
 
     def collect_k8s_namespaces(self):
         log.info("collecting Kubernetes namespaces yaml ...")
 
-        namespaces_file_name = "k8s-namespaces-{}.yaml".format(
-            utils.get_current_time())
-        cmd = "kubectl get ns -o yaml > {}/{}".format(
-            self.sysdump_dir_name, namespaces_file_name)
+        namespaces_file_name = f"k8s-namespaces-{utils.get_current_time()}.yaml"
+        cmd = f"kubectl get ns -o yaml > {self.sysdump_dir_name}/{namespaces_file_name}"
+
         try:
             subprocess.check_output(cmd, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError as exc:
             if exc.returncode != 0:
                 log.error("Error: {}. Unable to get kubernetes namespaces.")
         else:
-            log.info("collected kubernetes namespaces: {}"
-                     .format(namespaces_file_name))
+            log.info(f"collected kubernetes namespaces: {namespaces_file_name}")
 
     def collect(self, node_filter):
         pool = ThreadPool(min(32, multiprocessing.cpu_count() + 4))
@@ -622,7 +588,6 @@ class SysdumpCollector(object):
         filename = self.output or self.sysdump_dir_name
         archive_name = shutil.make_archive(filename, 'zip',
                                            self.sysdump_dir_name)
-        log.info("deleting directory: {}".format(self.sysdump_dir_name))
+        log.info(f"deleting directory: {self.sysdump_dir_name}")
         shutil.rmtree(self.sysdump_dir_name)
-        log.info("the sysdump has been saved in the file {}."
-                 .format(archive_name))
+        log.info(f"the sysdump has been saved in the file {archive_name}.")

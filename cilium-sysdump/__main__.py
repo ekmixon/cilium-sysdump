@@ -126,20 +126,13 @@ if __name__ == '__main__':
         namespace.cilium_ns = status[0]
     except RuntimeError:
         namespace.cilium_ns = args.cilium_ns
-        pass
-
     try:
         status = utils.get_resource_status(
             'pod', label=args.hubble_labels, must_exist=False,
         )
-        if status is None:
-            namespace.hubble_ns = args.hubble_ns
-        else:
-            namespace.hubble_ns = status[0]
+        namespace.hubble_ns = args.hubble_ns if status is None else status[0]
     except RuntimeError:
         namespace.hubble_ns = args.hubble_ns
-        pass
-
     try:
         status = utils.get_resource_status(
             'pod', label=args.hubble_relay_labels, must_exist=False,
@@ -150,20 +143,13 @@ if __name__ == '__main__':
             namespace.hubble_relay_ns = status[0]
     except RuntimeError:
         namespace.hubble_relay_ns = args.hubble_relay_ns
-        pass
-
     try:
         status = utils.get_resource_status(
             'pod', label=args.hubble_ui_labels, must_exist=False,
         )
-        if status is None:
-            namespace.hubble_ui_ns = args.hubble_ui_ns
-        else:
-            namespace.hubble_ui_ns = status[0]
+        namespace.hubble_ui_ns = args.hubble_ui_ns if status is None else status[0]
     except RuntimeError:
         namespace.hubble_ui_ns = args.hubble_ui_ns
-        pass
-
     log.debug('Fetching nodes to determine cluster size...')
     nodes = utils.get_nodes()
     if not nodes:
@@ -171,25 +157,22 @@ if __name__ == '__main__':
     if len(nodes) > 20 and (not args.nodes and
                             args.since == defaults.since and
                             args.size_limit == defaults.size_limit):
-        log.warning((
-            'Detected a large cluster (> 20) with {} nodes. Consider '
-            'setting one or more of the following to decrease the size '
-            'of the sysdump as many nodes will slow down the collection '
-            'and increase the size of the resulting '
-            'archive:\n'
-        ).format(len(nodes)) +
-            '  --nodes       (Nodes to collect from)          \n'
-            '  --since       (How far back in time to collect)\n'
-            '  --size-limit  (Size limit of Cilium logs)      \n'
+        log.warning(
+            (
+                f'Detected a large cluster (> 20) with {len(nodes)} nodes. Consider setting one or more of the following to decrease the size of the sysdump as many nodes will slow down the collection and increase the size of the resulting archive:\n'
+                + '  --nodes       (Nodes to collect from)          \n'
+                '  --since       (How far back in time to collect)\n'
+                '  --size-limit  (Size limit of Cilium logs)      \n'
+            )
         )
+
 
         choice = prompt('Continue [y/N] (default is N)? ').strip().lower()
         if not choice or choice == 'n':
             sys.exit(0)
 
     try:
-        sysdump_dir_name = './cilium-sysdump-{}'\
-            .format(time.strftime('%Y%m%d-%H%M%S'))
+        sysdump_dir_name = f"./cilium-sysdump-{time.strftime('%Y%m%d-%H%M%S')}"
         if not os.path.exists(sysdump_dir_name):
             os.makedirs(sysdump_dir_name)
         sysdumpcollector = sysdumpcollector.SysdumpCollector(

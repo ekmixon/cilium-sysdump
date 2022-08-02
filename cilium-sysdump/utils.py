@@ -79,25 +79,26 @@ def get_resource_status(type, full_name="", label="", must_exist=True):
             cmd, shell=True, stderr=subprocess.STDOUT,
         )
     except subprocess.CalledProcessError as exc:
-        log.warning("command to get status of {} has "
-                    "failed. error code: "
-                    "{} {}".format(full_name,
-                                   exc.returncode, exc.output))
+        log.warning(
+            f"command to get status of {full_name} has failed. error code: {exc.returncode} {exc.output}"
+        )
+
         raise RuntimeError(
-            "command to get status of {} has "
-            "failed. error code: "
-            "{} {}".format(full_name,
-                           exc.returncode, exc.output))
+            f"command to get status of {full_name} has failed. error code: {exc.returncode} {exc.output}"
+        )
+
     output = encoded_output.decode()
     if output == "":
         if not must_exist:
             return None
         log.warning(
-            "{} \"{}\" with label \"{}\" can't be found in "
-            "the cluster".format(type, full_name, label))
+            f"""{type} \"{full_name}\" with label \"{label}\" can't be found in the cluster"""
+        )
+
         raise RuntimeError(
-            "{} {} with label {} can't be found in the cluster".format(
-                type, full_name, label))
+            f"{type} {full_name} with label {label} can't be found in the cluster"
+        )
+
     # Example line:
     # kube-system cilium
     split_line = output.split(' ')
@@ -150,14 +151,17 @@ def get_pods_filtered(custom_columns, filter, must_exist=True):
             filter_cmd, shell=True, stderr=subprocess.STDOUT,
         )
     except subprocess.CalledProcessError as exc:
-        log.error("command to list filtered pods has "
-                  "failed. error code: "
-                  "{} {}".format(exc.returncode, exc.output))
+        log.error(
+            f"command to list filtered pods has failed. error code: {exc.returncode} {exc.output}"
+        )
+
     filter_output = filter_output.decode()
     if filter_output == "":
         if must_exist:
-            log.error("No output because all the pods were filtered "
-                      "out by the node filter {}.".format(filter))
+            log.error(
+                f"No output because all the pods were filtered out by the node filter {filter}."
+            )
+
         return []
 
     return filter_output.splitlines()
@@ -191,16 +195,15 @@ def get_pods_status_iterator_by_labels(label_selector, node_filter,
             cmd, shell=True, stderr=subprocess.STDOUT,
         )
     except subprocess.CalledProcessError as exc:
-        log.error("command to get status of {} has "
-                  "failed. error code: "
-                  "{} {}".format(label_selector,
-                                 exc.returncode, exc.output))
+        log.error(
+            f"command to get status of {label_selector} has failed. error code: {exc.returncode} {exc.output}"
+        )
+
         return
     output = encoded_output.decode()
     if output == "":
         if must_exist:
-            log.warning("no pods with labels {} are running on the cluster"
-                        .format(label_selector))
+            log.warning(f"no pods with labels {label_selector} are running on the cluster")
         return
 
     # Separate out IPs and node names if the input from user is mixed.
@@ -271,8 +274,10 @@ def get_container_names_per_pod(pod_namespace, pod_name, init_containers=True):
         pass
     output = output.decode().strip()
     if not output:
-        log.error("Error: Could not collect pod container name(s) for {}/{}"
-                  .format(pod_namespace, pod_name))
+        log.error(
+            f"Error: Could not collect pod container name(s) for {pod_namespace}/{pod_name}"
+        )
+
         return []
     return output.split(" ")
 
